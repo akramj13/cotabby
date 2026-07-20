@@ -192,6 +192,36 @@ final class CaretRunPlacementTests: XCTestCase {
         )
     }
 
+    func test_proportionalPlacement_preservesNativeWordParagraphRun() {
+        // Word exposes the writable document as a native AXTextArea and can publish paragraph
+        // descendants whose soft-wrapped frame is much taller than one line even though AXValue
+        // contains no newline. Before 0.6.1 those frames remained usable; the Claude-specific
+        // classifier must not demote them to the whole document frame.
+        let wordParagraph = "The project will continue with the new team members. We will start "
+            + "by assigning tasks and setting deadlines. We will also ensure that all team "
+            + "members are informed of their roles and responsibilities."
+        XCTAssertTrue(
+            AXTextGeometryResolver.shouldUseProportionalCaretPlacement(
+                text: wordParagraph,
+                frame: CGRect(x: 0, y: 0, width: 712, height: 66),
+                rejectsWrappedUnionFrames: false
+            )
+        )
+    }
+
+    func test_proportionalPlacement_stillRejectsSameRunForWebContent() {
+        let wrappedWebParagraph = "The project will continue with the new team members. We will "
+            + "start by assigning tasks and setting deadlines. We will also ensure that all team "
+            + "members are informed of their roles and responsibilities."
+        XCTAssertFalse(
+            AXTextGeometryResolver.shouldUseProportionalCaretPlacement(
+                text: wrappedWebParagraph,
+                frame: CGRect(x: 0, y: 0, width: 712, height: 66),
+                rejectsWrappedUnionFrames: true
+            )
+        )
+    }
+
     func test_wrappedRunCharacterBoundsAnchorAtTheTrailingEdge() {
         let characterFrame = CGRect(x: 610, y: 490, width: 7, height: 21)
 

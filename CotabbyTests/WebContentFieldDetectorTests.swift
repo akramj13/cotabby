@@ -68,6 +68,26 @@ final class WebContentFieldDetectorTests: XCTestCase {
         )
     }
 
+    func test_claudeDesktopWithoutDOMAttributesIsWebContent() {
+        // Claude's wrapped-run geometry repair must survive AX snapshots that omit DOM-reflection
+        // attributes, so its stable Electron bundle identifier is also a classification signal.
+        XCTAssertTrue(
+            WebContentFieldDetector.isWebContentField(
+                bundleIdentifier: "com.anthropic.claudefordesktop",
+                vendsDOMAttributes: false
+            )
+        )
+    }
+
+    func test_microsoftWordWithoutDOMAttributesIsNativeContent() {
+        XCTAssertFalse(
+            WebContentFieldDetector.isWebContentField(
+                bundleIdentifier: "com.microsoft.Word",
+                vendsDOMAttributes: false
+            )
+        )
+    }
+
     func test_nativeAppIsNotWebContent() {
         XCTAssertFalse(
             WebContentFieldDetector.isWebContentField(

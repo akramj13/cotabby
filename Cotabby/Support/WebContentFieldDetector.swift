@@ -30,6 +30,14 @@ import Foundation
 /// native field is keeping pre-repair behavior (never worse than before the estimator existed),
 /// while misclassifying a web field merely forgoes a repair.
 enum WebContentFieldDetector {
+    /// Web-rendered hosts that need web geometry policy but are not known to require Chromium's
+    /// Accessibility priming and cursor-recovery machinery. Keep this separate from
+    /// `BrowserAppDetector.isElectronEditor`: adding an app there deliberately enables several
+    /// broader AX recovery paths, while this allowlist changes only geometry classification.
+    private static let geometryOnlyWebBundleIdentifiers: Set<String> = [
+        "com.anthropic.claudefordesktop"
+    ]
+
     /// Attribute names only web-engine accessibility nodes vend. Checked against the element's
     /// advertised attribute list, which the focus resolver already fetches, so this costs no
     /// extra AX round-trip.
@@ -54,5 +62,11 @@ enum WebContentFieldDetector {
         }
         return BrowserAppDetector.isBrowser(bundleIdentifier: bundleIdentifier)
             || BrowserAppDetector.isElectronEditor(bundleIdentifier: bundleIdentifier)
+            || isGeometryOnlyWebHost(bundleIdentifier: bundleIdentifier)
+    }
+
+    private static func isGeometryOnlyWebHost(bundleIdentifier: String?) -> Bool {
+        guard let lowered = bundleIdentifier?.lowercased() else { return false }
+        return geometryOnlyWebBundleIdentifiers.contains(lowered)
     }
 }

@@ -50,6 +50,11 @@ final class BrowserAppDetectorTests: XCTestCase {
         XCTAssertTrue(
             BrowserAppDetector.needsWebAccessibilityPriming(bundleIdentifier: "com.microsoft.VSCode"))
         XCTAssertFalse(
+            BrowserAppDetector.needsWebAccessibilityPriming(
+                bundleIdentifier: "com.anthropic.claudefordesktop"
+            )
+        )
+        XCTAssertFalse(
             BrowserAppDetector.needsWebAccessibilityPriming(bundleIdentifier: "com.apple.Safari"))
         XCTAssertFalse(
             BrowserAppDetector.needsWebAccessibilityPriming(bundleIdentifier: "org.mozilla.firefox"))

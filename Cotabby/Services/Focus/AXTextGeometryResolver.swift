@@ -80,6 +80,7 @@ struct AXTextGeometryResolver {
         cocoaAnchorFrame: CGRect?,
         textValue: String? = nil,
         textSelection: NSRange? = nil,
+        rejectsWrappedUnionFrames: Bool = false,
         staticRunThrottle: StaticTextRunWalkThrottle? = nil,
         focusChangeSequence: UInt64 = 0
     ) -> CaretGeometryResult? {
@@ -156,6 +157,7 @@ struct AXTextGeometryResolver {
                 parentSelection: selectionInTextValue,
                 parentText: parentText,
                 fallbackFrame: cocoaAnchorFrame,
+                rejectsWrappedUnionFrames: rejectsWrappedUnionFrames,
                 staticRunThrottle: staticRunThrottle,
                 focusChangeSequence: focusChangeSequence
             ) {
@@ -229,6 +231,7 @@ struct AXTextGeometryResolver {
         parentSelection: NSRange,
         parentText: String,
         fallbackFrame: CGRect?,
+        rejectsWrappedUnionFrames: Bool,
         staticRunThrottle: StaticTextRunWalkThrottle? = nil,
         focusChangeSequence: UInt64 = 0
     ) -> CaretGeometryResult? {
@@ -247,10 +250,16 @@ struct AXTextGeometryResolver {
                 focusChangeSequence: focusChangeSequence,
                 interval: Self.staticRunWalkThrottleInterval
             ) {
-                collectStaticTextRuns(from: element)
+                collectStaticTextRuns(
+                    from: element,
+                    rejectsWrappedUnionFrames: rejectsWrappedUnionFrames
+                )
             }
         } else {
-            textRuns = collectStaticTextRuns(from: element)
+            textRuns = collectStaticTextRuns(
+                from: element,
+                rejectsWrappedUnionFrames: rejectsWrappedUnionFrames
+            )
         }
 
         guard !textRuns.isEmpty else { return nil }
@@ -434,6 +443,28 @@ struct AXTextGeometryResolver {
         ]).width
         let widthTolerance: CGFloat = 1.15
         return estimatedSingleLineWidth <= frame.width * widthTolerance
+    }
+
+    /// Applies wrapped-union rejection only to web-rendered fields.
+    ///
+    /// The width/height heuristic above was derived from Claude's Electron AX tree. Native apps
+    /// are free to expose paragraph-shaped `AXStaticText` descendants while keeping selection on
+    /// their parent editor; Microsoft Word does exactly that. Treating those native descendants as
+    /// Claude-style union frames discards their usable run geometry and falls back to the entire
+    /// document frame. Unknown/native fields therefore preserve the pre-0.6.1 proportional path,
+    /// while Chromium/Electron callers explicitly opt into the wrapped-frame safety check.
+    static func shouldUseProportionalCaretPlacement(
+        text: String,
+        frame: CGRect,
+        rejectsWrappedUnionFrames: Bool
+    ) -> Bool {
+        guard !text.isEmpty, AXHelper.rectHasFiniteComponents(frame), !frame.isEmpty else {
+            return false
+        }
+        guard rejectsWrappedUnionFrames else {
+            return true
+        }
+        return canUseProportionalCaretPlacement(text: text, frame: frame)
     }
 
     /// Converts the measured character immediately before the selection into Cotabby's normalized
@@ -680,7 +711,8 @@ struct AXTextGeometryResolver {
     /// Branch 3 (`AXFrame`) fallback. We scan descendants in pre-order so cumulative text length
     /// still tracks visual reading order in most editor trees.
     private func collectStaticTextRuns(
-        from root: AXUIElement
+        from root: AXUIElement,
+        rejectsWrappedUnionFrames: Bool
     ) -> [StaticTextRunWalkThrottle.TextRun] {
         let maxDepth = 8
         let maxNodes = 300
@@ -706,9 +738,10 @@ struct AXTextGeometryResolver {
                 !text.isEmpty,
                 let frame = AXHelper.rectValue(for: "AXFrame" as CFString, on: element),
                 !frame.isEmpty {
-                let allowsProportionalCaretPlacement = Self.canUseProportionalCaretPlacement(
+                let allowsProportionalCaretPlacement = Self.shouldUseProportionalCaretPlacement(
                     text: text,
-                    frame: frame
+                    frame: frame,
+                    rejectsWrappedUnionFrames: rejectsWrappedUnionFrames
                 )
                 var caretCharacterFrame: CGRect?
                 // Pay the extra parameterized AX query only for an ambiguous wrapped frame that

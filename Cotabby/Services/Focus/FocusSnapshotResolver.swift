@@ -191,7 +191,8 @@ struct FocusSnapshotResolver {
                 resolveDeepGeometrySource(
                     focusedElement: focusedElement,
                     resolvedElement: resolvedCandidate.element,
-                    cocoaAnchorFrame: resolvedCandidate.inputFrameRect
+                    cocoaAnchorFrame: resolvedCandidate.inputFrameRect,
+                    rejectsWrappedUnionFrames: resolvedCandidate.isWebContentField
                 )
             }
         }
@@ -283,13 +284,9 @@ struct FocusSnapshotResolver {
                     for: "AXDOMClassList" as CFString, on: focusedElement) ?? []
             )
         }
-        // Web-vs-native classification for the caret-geometry trust policy. The DOM-attribute
-        // signal was computed in `candidateSnapshot` from the attribute list it already fetched,
-        // so this adds no AX round-trip to the focus poll.
-        let isWebContentField = WebContentFieldDetector.isWebContentField(
-            bundleIdentifier: bundleIdentifier,
-            vendsDOMAttributes: resolvedCandidate.vendsDOMAttributes
-        )
+        // `candidateSnapshot` classified the field before resolving geometry, then stored the
+        // result beside the winning candidate. Reuse that same verdict for the downstream layout
+        // trust policy so capture and presentation cannot disagree about whether this is web text.
         let context = FocusedInputSnapshot(
             applicationName: applicationName,
             bundleIdentifier: bundleIdentifier,
@@ -308,7 +305,7 @@ struct FocusSnapshotResolver {
             selection: contextWindow.selection,
             isSecure: resolvedCandidate.isSecure,
             isIntegratedTerminal: isIntegratedTerminal,
-            isWebContentField: isWebContentField,
+            isWebContentField: resolvedCandidate.isWebContentField,
             focusChangeSequence: focusChangeSequence,
             focusedURLString: focusedURLString,
             resolvedFieldStyle: resolvedFieldStyle,
@@ -577,11 +574,13 @@ struct FocusSnapshotResolver {
     private func resolveDeepGeometrySource(
         focusedElement: AXUIElement,
         resolvedElement: AXUIElement,
-        cocoaAnchorFrame: CGRect?
+        cocoaAnchorFrame: CGRect?,
+        rejectsWrappedUnionFrames: Bool
     ) -> CaretGeometryResult? {
         if let result = findDeepGeometrySource(
             from: resolvedElement,
-            cocoaAnchorFrame: cocoaAnchorFrame
+            cocoaAnchorFrame: cocoaAnchorFrame,
+            rejectsWrappedUnionFrames: rejectsWrappedUnionFrames
         ) {
             return result
         }
@@ -595,7 +594,8 @@ struct FocusSnapshotResolver {
 
         return findDeepGeometrySource(
             from: focusedElement,
-            cocoaAnchorFrame: cocoaAnchorFrame
+            cocoaAnchorFrame: cocoaAnchorFrame,
+            rejectsWrappedUnionFrames: rejectsWrappedUnionFrames
         )
     }
 
@@ -606,7 +606,8 @@ struct FocusSnapshotResolver {
     /// We only read position from these nodes; the input target (where we type) stays unchanged.
     private func findDeepGeometrySource(
         from root: AXUIElement,
-        cocoaAnchorFrame: CGRect?
+        cocoaAnchorFrame: CGRect?,
+        rejectsWrappedUnionFrames: Bool
     ) -> CaretGeometryResult? {
         var queue: [(element: AXUIElement, depth: Int)] = [(root, 0)]
         let maxDepth = 10
@@ -641,7 +642,8 @@ struct FocusSnapshotResolver {
                     ),
                     supportsFrame: attrs.contains("AXFrame"),
                     cocoaAnchorFrame: cocoaAnchorFrame,
-                    textValue: textValue
+                    textValue: textValue,
+                    rejectsWrappedUnionFrames: rejectsWrappedUnionFrames
                 )
 
                 if let result, result.quality == .exact || result.quality == .derived {
@@ -726,6 +728,15 @@ struct FocusSnapshotResolver {
         let editableHintScore = AXHelper.editabilityHintScore(
             role: role,
             explicitEditableFlag: explicitEditableFlag
+        )
+        // Classify the rendering engine before resolving caret geometry. Wrapped `AXStaticText`
+        // rejection is an Electron/Chromium repair and must not reinterpret native Word paragraph
+        // nodes as union frames. Both signals come from data already read for this candidate, so
+        // the boundary adds no Accessibility round-trip to the focus poll.
+        let vendsDOMAttributes = WebContentFieldDetector.vendsDOMAttributes(supportedAttributes)
+        let isWebContentField = WebContentFieldDetector.isWebContentField(
+            bundleIdentifier: bundleIdentifier,
+            vendsDOMAttributes: vendsDOMAttributes
         )
         let hasStrongEditabilitySignal = AXHelper.hasStrongEditabilitySignal(
             role: role,
@@ -821,6 +832,7 @@ struct FocusSnapshotResolver {
                 cocoaAnchorFrame: inputFrameRect,
                 textValue: textValue,
                 textSelection: selection,
+                rejectsWrappedUnionFrames: isWebContentField,
                 // The run-walk throttle slot is shared across calls, so it is restricted to the
                 // focused element: that is the per-tick steady-state caller, and scoping prevents
                 // one slot from serving run frames collected under a different root element.
@@ -832,9 +844,6 @@ struct FocusSnapshotResolver {
         }
         let caretRect = caretResult?.rect
         let caretQuality = caretResult?.quality
-        // Recorded from the already-fetched attribute list (no extra AX call) so snapshot
-        // assembly can classify the field as web-rendered without touching the element again.
-        let vendsDOMAttributes = WebContentFieldDetector.vendsDOMAttributes(supportedAttributes)
         let elementIdentifier = AXHelper.elementIdentifier(
             for: element, bundleIdentifier: bundleIdentifier)
         // Secure-ness is invariant for an element's lifetime, and the three marker probes behind
@@ -875,7 +884,7 @@ struct FocusSnapshotResolver {
             caretAllowsDeepSearch: caretResult?.allowsDeepSearch ?? true,
             inputFrameRect: inputFrameRect,
             isSecure: isSecure,
-            vendsDOMAttributes: vendsDOMAttributes,
+            isWebContentField: isWebContentField,
             resolverCandidate: resolverCandidate
         )
     }
@@ -1019,8 +1028,8 @@ private struct AXFocusCandidate {
     let caretAllowsDeepSearch: Bool
     let inputFrameRect: CGRect?
     let isSecure: Bool
-    /// Whether the element advertises DOM-reflection attributes, marking it as web-engine
-    /// content (see `WebContentFieldDetector`).
-    let vendsDOMAttributes: Bool
+    /// Whether the candidate is rendered by a web engine. Computed before geometry resolution so
+    /// Electron-specific wrapped-run heuristics never reinterpret native Word paragraph nodes.
+    let isWebContentField: Bool
     let resolverCandidate: FocusCapabilityCandidate
 }
