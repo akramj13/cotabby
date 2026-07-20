@@ -183,18 +183,29 @@ struct WindowScreenshotService: WindowScreenshotCapturing {
     /// Wraps ScreenCaptureKit's callback API so the rest of the app can use structured concurrency.
     private func currentShareableContent() async throws -> SCShareableContent {
         try await withCheckedThrowingContinuation { continuation in
+            // ScreenCaptureKit owns callback delivery. Guard every branch so an OS-level duplicate
+            // callback cannot turn a recoverable capture failure into a process-wide Swift trap.
+            let completionGate = OneShotActionGate()
             SCShareableContent.getExcludingDesktopWindows(true, onScreenWindowsOnly: true) { content, error in
                 if let error {
-                    continuation.resume(throwing: WindowScreenshotError.captureFailed(error.localizedDescription))
+                    completionGate.run {
+                        continuation.resume(throwing: WindowScreenshotError.captureFailed(error.localizedDescription))
+                    }
                     return
                 }
 
                 guard let content else {
-                    continuation.resume(throwing: WindowScreenshotError.captureFailed("Shareable content was unavailable."))
+                    completionGate.run {
+                        continuation.resume(
+                            throwing: WindowScreenshotError.captureFailed("Shareable content was unavailable.")
+                        )
+                    }
                     return
                 }
 
-                continuation.resume(returning: content)
+                completionGate.run {
+                    continuation.resume(returning: content)
+                }
             }
         }
     }
@@ -205,18 +216,27 @@ struct WindowScreenshotService: WindowScreenshotCapturing {
         configuration: SCStreamConfiguration
     ) async throws -> CGImage {
         try await withCheckedThrowingContinuation { continuation in
+            let completionGate = OneShotActionGate()
             SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration) { image, error in
                 if let error {
-                    continuation.resume(throwing: WindowScreenshotError.captureFailed(error.localizedDescription))
+                    completionGate.run {
+                        continuation.resume(throwing: WindowScreenshotError.captureFailed(error.localizedDescription))
+                    }
                     return
                 }
 
                 guard let image else {
-                    continuation.resume(throwing: WindowScreenshotError.captureFailed("ScreenCaptureKit returned no image."))
+                    completionGate.run {
+                        continuation.resume(
+                            throwing: WindowScreenshotError.captureFailed("ScreenCaptureKit returned no image.")
+                        )
+                    }
                     return
                 }
 
-                continuation.resume(returning: image)
+                completionGate.run {
+                    continuation.resume(returning: image)
+                }
             }
         }
     }
