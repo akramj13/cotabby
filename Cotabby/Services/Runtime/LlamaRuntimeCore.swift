@@ -719,16 +719,18 @@ nonisolated final class LlamaRuntimeCore: @unchecked Sendable {
     private static let defaultSamplerSeed: UInt32 = 0x00C0_FFEE
 
     private static func samplingConfig(from options: LlamaGenerationOptions) -> SamplingConfig {
-        SamplingConfig(
-            max_prediction_tokens: Int32(options.maxPredictionTokens),
-            temperature: Float(options.temperature),
-            top_k: Int32(options.topK),
-            top_p: Float(options.topP),
-            min_p: Float(options.minP),
-            repetition_penalty: Float(options.repetitionPenalty),
-            seed: options.seed ?? Self.defaultSamplerSeed,
-            single_line: options.singleLine
-        )
+        // Assign fields after default construction so this checkout remains source-compatible as
+        // CotabbyInference removes native configuration fields Swift never consumed. The Swift
+        // generation loop above remains the single owner of the maximum output-token budget.
+        var config = SamplingConfig()
+        config.temperature = Float(options.temperature)
+        config.top_k = Int32(options.topK)
+        config.top_p = Float(options.topP)
+        config.min_p = Float(options.minP)
+        config.repetition_penalty = Float(options.repetitionPenalty)
+        config.seed = options.seed ?? Self.defaultSamplerSeed
+        config.single_line = options.singleLine
+        return config
     }
 
     private static func reusableTokenCount(commonTokenPrefix: Int, newPromptTokenCount: Int) -> Int {
