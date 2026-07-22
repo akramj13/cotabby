@@ -49,28 +49,6 @@ enum ScreenTextExtractionError: LocalizedError {
     }
 }
 
-/// Guards the callback-to-async bridge for a single OCR request.
-///
-/// Vision can report a request failure through `VNRecognizeTextRequest`'s completion handler and
-/// then rethrow that same failure from `VNImageRequestHandler.perform(_:)`. Swift checked
-/// continuations must resume exactly once, so both paths share this short-lived gate.
-private final class OCRContinuationResumer {
-    private let lock = NSLock()
-    private var hasResumed = false
-
-    func resume(_ action: () -> Void) {
-        lock.lock()
-        let shouldResume = !hasResumed
-        if shouldResume {
-            hasResumed = true
-        }
-        lock.unlock()
-
-        guard shouldResume else { return }
-        action()
-    }
-}
-
 struct ScreenTextExtractor: ScreenTextExtracting {
     /// Vision cannot produce useful text from near-zero-sized request images. Treating those as
     /// empty OCR keeps degenerate screenshots on the same unavailable-context path as blank windows.
@@ -108,12 +86,14 @@ struct ScreenTextExtractor: ScreenTextExtracting {
         }
 
         return try await withCheckedThrowingContinuation { continuation in
-            let resumer = OCRContinuationResumer()
+            // Vision can surface one failure through both the request callback and `perform`'s
+            // thrown error. The shared gate preserves checked continuation's exactly-once rule.
+            let completionGate = OneShotActionGate()
 
             DispatchQueue.global(qos: .userInitiated).async {
                 let request = VNRecognizeTextRequest { request, error in
                     if let error {
-                        resumer.resume {
+                        completionGate.run {
                             let elapsedMilliseconds = Int(Date().timeIntervalSince(startedAt) * 1000)
                             self.log("ocr-failed elapsed_ms=\(elapsedMilliseconds) reason=\(error.localizedDescription)")
                             continuation.resume(
@@ -146,7 +126,7 @@ struct ScreenTextExtractor: ScreenTextExtracting {
                     let cappedText = String(joinedText.prefix(maxRecognizedCharacters))
 
                     guard !cappedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                        resumer.resume {
+                        completionGate.run {
                             let elapsedMilliseconds = Int(Date().timeIntervalSince(startedAt) * 1000)
                             self.log("ocr-empty elapsed_ms=\(elapsedMilliseconds) lines=\(recognizedLines.count)")
                             continuation.resume(throwing: ScreenTextExtractionError.noRecognizedText)
@@ -154,7 +134,7 @@ struct ScreenTextExtractor: ScreenTextExtracting {
                         return
                     }
 
-                    resumer.resume {
+                    completionGate.run {
                         let elapsedMilliseconds = Int(Date().timeIntervalSince(startedAt) * 1000)
                         self.log(
                             "ocr-success elapsed_ms=\(elapsedMilliseconds) lines=\(recognizedLines.count) chars=\(cappedText.count) " +
@@ -184,7 +164,7 @@ struct ScreenTextExtractor: ScreenTextExtracting {
                     let handler = VNImageRequestHandler(cgImage: preparedImage, options: [:])
                     try handler.perform([request])
                 } catch {
-                    resumer.resume {
+                    completionGate.run {
                         let elapsedMilliseconds = Int(Date().timeIntervalSince(startedAt) * 1000)
                         self.log("ocr-failed elapsed_ms=\(elapsedMilliseconds) reason=\(error.localizedDescription)")
                         continuation.resume(
