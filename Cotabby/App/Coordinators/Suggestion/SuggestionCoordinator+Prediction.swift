@@ -1013,6 +1013,8 @@ extension SuggestionCoordinator {
         SuggestionAvailabilityEvaluator.disabledReason(
             globallyEnabled: settingsSnapshot.isGloballyEnabled,
             temporarilyPaused: settingsSnapshot.isTemporarilyPaused,
+            isLowPowerModeActive: lowPowerModeProvider.isLowPowerModeEnabled,
+            isLowPowerModeAutoDisableEnabled: settingsSnapshot.isLowPowerModeAutoDisableEnabled,
             disabledAppBundleIdentifiers: settingsSnapshot.disabledAppBundleIdentifiers,
             disabledDomains: PerDomainDisableSettings.disabledDomains(),
             suggestInIntegratedTerminals: settingsSnapshot.suggestInIntegratedTerminals,
