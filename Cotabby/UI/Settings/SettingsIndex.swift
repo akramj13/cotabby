@@ -325,7 +325,7 @@ enum SettingsItem: String, CaseIterable, Identifiable {
         case .offerTypoCorrections: return "Offer a green replacement for the misspelled word."
         case .spellingDictionaries: return "Dictionaries used to detect typos."
         case .automaticallyFixTypos: return "Replace a misspelled word right after you press Space."
-        case .learnedWords: return "Words you kept after an automatic fix; never corrected again."
+        case .learnedWords: return "Words kept after an automatic fix; forget them here to correct them again."
         case .extendedContext: return "A glossary or notes sent with every suggestion."
         case .contextLivePreview: return "A real field that exercises the full pipeline."
         case .engine: return "Apple Intelligence, bundled Open Source, or a local endpoint."
@@ -476,7 +476,8 @@ enum SettingsItem: String, CaseIterable, Identifiable {
                     "replace", "space", "instant", "without accepting"]
         case .learnedWords:
             return ["learned", "learn", "ignore", "ignored", "exception", "whitelist", "forget",
-                    "stop correcting", "never correct", "dictionary", "typo", "autocorrect", "undo"]
+                    "delete", "remove", "manage", "stop correcting", "never correct", "dictionary",
+                    "typo", "autocorrect", "undo"]
         case .extendedContext:
             return ["context", "glossary", "reference", "notes", "jargon", "instructions",
                     "memory", "background", "system prompt", "vocabulary"]
