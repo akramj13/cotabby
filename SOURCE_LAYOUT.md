@@ -41,7 +41,7 @@ Cotabby/
 │   ├── Runtime/
 │   │   └── Metrics/                  performance and system metric stores
 │   ├── Settings/                     durable and UI-facing settings values
-│   ├── Spelling/                     spelling catalog values
+│   ├── Spelling/                     spelling catalog and learned-word values
 │   └── Suggestion/
 │       ├── Request/                  immutable request inputs and configuration
 │       ├── Result/                   engine result and client error values

@@ -6,6 +6,7 @@ import SwiftUI
 /// style rules.
 struct WritingPaneView: View {
     @ObservedObject var suggestionSettings: SuggestionSettingsModel
+    @ObservedObject var learnedWordStore: LearnedWordStore
 
     var body: some View {
         SettingsPaneScaffold {
@@ -110,6 +111,23 @@ struct WritingPaneView: View {
                         )
                     }
                     .settingsItem(.automaticallyFixTypos)
+
+                    // Words kept after an automatic fix was undone (see LearnedWordStore). Shown
+                    // whenever corrections are available, because a learned word also stops the
+                    // typo gate and correction offers, not just the automatic fix.
+                    LabeledContent {
+                        Button("Forget All") {
+                            learnedWordStore.forgetAll()
+                        }
+                        .disabled(learnedWordStore.words.isEmpty)
+                    } label: {
+                        SettingsRowLabel(
+                            title: "Learned Words",
+                            description: learnedWordsDescription,
+                            systemImage: "character.book.closed.fill"
+                        )
+                    }
+                    .settingsItem(.learnedWords)
                 }
 
                 // Dictionaries rank candidates for the two correction actions above, so they only
@@ -189,6 +207,21 @@ struct WritingPaneView: View {
             get: { suggestionSettings.suppressCompletionsOnTypo },
             set: { suggestionSettings.setSuppressCompletionsOnTypo($0) }
         )
+    }
+
+    /// Lists the learned words inline so the row doubles as the overview. A long list is truncated
+    /// rather than scrolled because this is a glance-and-forget surface, not an editor.
+    private var learnedWordsDescription: String {
+        let words = learnedWordStore.words
+        guard !words.isEmpty else {
+            return "When you delete an automatic fix and retype the word, Cotabby remembers it here " +
+                "and stops correcting it."
+        }
+        let shownCount = min(words.count, 6)
+        let shown = words.suffix(shownCount).reversed().joined(separator: ", ")
+        let remainder = words.count - shownCount
+        let suffix = remainder > 0 ? " and \(remainder) more" : ""
+        return "Never corrected again: \(shown)\(suffix)."
     }
 
     private var offerTypoCorrectionsBinding: Binding<Bool> {

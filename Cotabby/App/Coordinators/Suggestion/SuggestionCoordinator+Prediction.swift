@@ -454,6 +454,11 @@ extension SuggestionCoordinator {
             )
             return true
         case let .applyCorrection(word, correctedWord):
+            if learnRejectedCorrection(for: word, rawContext: rawContext, workID: workID) {
+                // The user just undid this exact fix and typed the word again: leave it alone and
+                // continue with a normal completion instead of re-correcting.
+                return false
+            }
             applyAutomaticCorrection(
                 typoWord: word,
                 correctedWord: correctedWord,
@@ -462,6 +467,38 @@ extension SuggestionCoordinator {
             )
             return true
         }
+    }
+
+    /// Ends the correct-undo-retype loop: when the word the gate wants to fix is one whose earlier
+    /// automatic fix the user removed from this same field, learn the word instead. Returns `true`
+    /// after learning so the caller falls through to a normal continuation.
+    private func learnRejectedCorrection(
+        for word: String,
+        rawContext: FocusedInputSnapshot,
+        workID: UInt64
+    ) -> Bool {
+        let fieldIdentityKey = rawContext.focusedInputIdentityKey
+        let wasRejected = recentAutomaticCorrections.contains { record in
+            CorrectionRejectionDetector.isRejection(
+                of: record,
+                fieldIdentityKey: fieldIdentityKey,
+                precedingText: rawContext.precedingText,
+                completedWord: word
+            )
+        }
+        guard wasRejected else {
+            return false
+        }
+        spellChecker.learn(word)
+        recentAutomaticCorrections.removeAll {
+            $0.typoWord.caseInsensitiveCompare(word) == .orderedSame
+        }
+        logStage(
+            "typo-correction-rejected",
+            workID: workID,
+            message: "Learned \"\(word)\" because its automatic correction was undone and the word typed again."
+        )
+        return true
     }
 
     /// Routes the typo to one enabled language-specific SymSpell index. The dictionaries remain
@@ -534,6 +571,13 @@ extension SuggestionCoordinator {
             return
         }
 
+        rememberAutomaticCorrection(
+            AppliedCorrectionRecord(
+                fieldIdentityKey: liveContext.focusedInputIdentityKey,
+                typoWord: typoWord,
+                correctedWord: correctedWord
+            )
+        )
         focusModel.invalidateTransientCaretCaches()
         cancelPredictionWork()
         clearSuggestion(clearDiagnostics: false)
@@ -549,6 +593,17 @@ extension SuggestionCoordinator {
         // Synthetic replacement is asynchronous from the host editor's perspective. Poll until AX
         // publishes the corrected text before asking for the next continuation.
         schedulePredictionAfterHostPublishDelay()
+    }
+
+    /// Keeps the bounded, field-scoped memory that `learnRejectedCorrection` consults. Newest last;
+    /// the oldest record drops once the cap is reached, which is plenty for the undo-and-retype
+    /// pattern that always concerns the most recent fix.
+    private func rememberAutomaticCorrection(_ record: AppliedCorrectionRecord) {
+        recentAutomaticCorrections.append(record)
+        let overflow = recentAutomaticCorrections.count - Self.recentAutomaticCorrectionsCapacity
+        if overflow > 0 {
+            recentAutomaticCorrections.removeFirst(overflow)
+        }
     }
 
     /// Presents a native spell-checker correction as a replace-the-word suggestion, with no model

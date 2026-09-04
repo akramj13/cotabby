@@ -236,6 +236,41 @@ final class SuggestionCoordinatorPredictionTests: XCTestCase {
         XCTAssertTrue(rig.engine.requests.isEmpty)
     }
 
+    /// The correct-undo-retype loop: after the fix is applied once, the same word finished again in
+    /// the same field with the replacement gone must be learned and left alone, and the cycle must
+    /// continue into a normal continuation instead of a second correction.
+    func test_typoGate_learnsAWordWhoseAutomaticFixTheUserUndid() async {
+        let learnedWords = LearnedWordStore(defaults: InMemoryLearnedWordDefaults())
+        let rig = retained(makeCoordinatorRig(
+            snapshot: CotabbyTestFixtures.focusedInputSnapshot(precedingText: "I typed recieve "),
+            settingsSnapshot: CotabbyTestFixtures.settingsSnapshot(
+                debounceMilliseconds: 1,
+                suppressCompletionsOnTypo: true,
+                offerTypoCorrections: true,
+                automaticallyFixTypos: true
+            ),
+            spellChecker: CurrentWordSpellChecker(learnedWords: learnedWords)
+        ))
+
+        rig.coordinator.schedulePrediction()
+        await waitUntil("Automatic correction never ran") { !rig.inserter.replacements.isEmpty }
+        XCTAssertEqual(rig.inserter.replacements.count, 1)
+
+        // The user deleted "receive" and typed the word again in the same field: the replacement is
+        // gone from the text before the caret, so this is a rejection, not a repeat of the typo.
+        rig.focusProvider.snapshot = FocusSnapshot(
+            applicationName: rig.focusProvider.snapshot.applicationName,
+            bundleIdentifier: rig.focusProvider.snapshot.bundleIdentifier,
+            capability: .supported,
+            context: CotabbyTestFixtures.focusedInputSnapshot(precedingText: "I typed the word recieve ")
+        )
+        rig.coordinator.schedulePrediction()
+        await waitUntil("A normal continuation was never requested") { !rig.engine.requests.isEmpty }
+
+        XCTAssertEqual(rig.inserter.replacements.count, 1, "A rejected fix must not be applied again")
+        XCTAssertTrue(learnedWords.contains("recieve"))
+    }
+
     // MARK: - Environment reconciliation
 
     func test_reconcileWithCurrentEnvironment_reenablesOnceTheBlockerClears() {

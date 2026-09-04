@@ -118,10 +118,14 @@ final class CurrentWordSpellCheckerTests: XCTestCase {
     /// App-hosted tests have crashed deallocating short-lived `@MainActor` objects, so checkers are
     /// retained for the process lifetime (mirrors `SuggestionStateHelperTests`).
     private static var retainedCheckers: [CurrentWordSpellChecker] = []
+    private static var retainedStores: [LearnedWordStore] = []
 
-    private func makeChecker() -> CurrentWordSpellChecker {
-        let checker = CurrentWordSpellChecker()
+    private func makeChecker(learnedWords: LearnedWordStore? = nil) -> CurrentWordSpellChecker {
+        let checker = CurrentWordSpellChecker(learnedWords: learnedWords)
         Self.retainedCheckers.append(checker)
+        if let learnedWords {
+            Self.retainedStores.append(learnedWords)
+        }
         return checker
     }
 
@@ -189,5 +193,24 @@ final class CurrentWordSpellCheckerTests: XCTestCase {
             true,
             "a capitalized typo must yield a capitalized correction, got \(correction)"
         )
+    }
+
+    /// The learned-word short circuit is the one rule here that does not depend on the machine's
+    /// dictionaries, so it can be pinned exactly: a learned word is never a typo, in any case.
+    func test_isTypo_learnedWordsAreNeverTypos() async {
+        let store = LearnedWordStore(defaults: InMemoryLearnedWordDefaults())
+        let checker = makeChecker(learnedWords: store)
+
+        checker.learn("chatgpt")
+
+        XCTAssertFalse(checker.isTypo("chatgpt"))
+        XCTAssertFalse(checker.isTypo("ChatGPT"), "Matching must ignore capitalization")
+        XCTAssertTrue(store.contains("chatgpt"), "learn(_:) must reach the shared store")
+    }
+
+    func test_learn_isANoOpWithoutAStore() async {
+        let checker = makeChecker()
+        checker.learn("chatgpt")
+        XCTAssertFalse(checker.isTypo(""), "Sanity: the empty-word guard still applies")
     }
 }

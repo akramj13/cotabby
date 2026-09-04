@@ -49,6 +49,7 @@ enum SettingsItem: String, CaseIterable, Identifiable {
     case offerTypoCorrections
     case spellingDictionaries
     case automaticallyFixTypos
+    case learnedWords
     // Context
     case extendedContext
     case contextLivePreview
@@ -132,6 +133,7 @@ enum SettingsItem: String, CaseIterable, Identifiable {
         case .offerTypoCorrections: return "Offer Corrections on Typo"
         case .spellingDictionaries: return "Spelling Dictionaries"
         case .automaticallyFixTypos: return "Automatically Fix Typos"
+        case .learnedWords: return "Learned Words"
         case .extendedContext: return "Extended Context"
         case .contextLivePreview: return "Live Preview"
         case .engine: return "Engine"
@@ -208,6 +210,7 @@ enum SettingsItem: String, CaseIterable, Identifiable {
         case .offerTypoCorrections: return "checkmark.bubble"
         case .spellingDictionaries: return "character.book.closed"
         case .automaticallyFixTypos: return "checkmark.circle"
+        case .learnedWords: return "character.book.closed.fill"
         case .extendedContext: return "doc.text"
         case .contextLivePreview: return "text.cursor"
         case .engine: return "cpu"
@@ -261,7 +264,8 @@ enum SettingsItem: String, CaseIterable, Identifiable {
         case .emojiPicker, .emojiSkinTone, .emojiPeopleStyle, .emojiHistory:
             return .emoji
         case .length, .acceptPunctuation, .addSpaceAfterAccept, .name, .languages, .customRules,
-             .hideSuggestionsOnTypo, .offerTypoCorrections, .spellingDictionaries, .automaticallyFixTypos:
+             .hideSuggestionsOnTypo, .offerTypoCorrections, .spellingDictionaries, .automaticallyFixTypos,
+             .learnedWords:
             return .writing
         case .extendedContext, .contextLivePreview:
             return .context
@@ -321,6 +325,7 @@ enum SettingsItem: String, CaseIterable, Identifiable {
         case .offerTypoCorrections: return "Offer a green replacement for the misspelled word."
         case .spellingDictionaries: return "Dictionaries used to detect typos."
         case .automaticallyFixTypos: return "Replace a misspelled word right after you press Space."
+        case .learnedWords: return "Words you kept after an automatic fix; never corrected again."
         case .extendedContext: return "A glossary or notes sent with every suggestion."
         case .contextLivePreview: return "A real field that exercises the full pipeline."
         case .engine: return "Apple Intelligence, bundled Open Source, or a local endpoint."
@@ -469,6 +474,9 @@ enum SettingsItem: String, CaseIterable, Identifiable {
         case .automaticallyFixTypos:
             return ["typo", "automatic", "automatically", "autocorrect", "fix", "spelling",
                     "replace", "space", "instant", "without accepting"]
+        case .learnedWords:
+            return ["learned", "learn", "ignore", "ignored", "exception", "whitelist", "forget",
+                    "stop correcting", "never correct", "dictionary", "typo", "autocorrect", "undo"]
         case .extendedContext:
             return ["context", "glossary", "reference", "notes", "jargon", "instructions",
                     "memory", "background", "system prompt", "vocabulary"]

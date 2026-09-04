@@ -348,3 +348,32 @@ struct FocusedApplicationIdentity: Equatable {
     let applicationName: String
     let bundleIdentifier: String
 }
+
+/// Per-process identity key for a focused field, shared by `FocusedInputSnapshot` and
+/// `FocusedInputContext` so state scoped "to this field" agrees no matter which value a caller
+/// holds. Distinct from `FocusedInputIdentity`, which keys one focus *event* by AX element and
+/// focus sequence; this key survives focus-sequence bumps for the same field. It deliberately
+/// excludes the input frame, because a composer that grows as the user types is still the same
+/// field (see `FocusedInputContext.focusedInputIdentityKey`). `hashValue` is randomized per
+/// process, which is fine because keys are only ever compared within one process.
+nonisolated enum FocusedInputIdentityKey {
+    static func key(bundleIdentifier: String, processIdentifier: Int32, elementIdentifier: String) -> UInt64 {
+        var hasher = Hasher()
+        hasher.combine(bundleIdentifier)
+        hasher.combine(processIdentifier)
+        hasher.combine(elementIdentifier)
+        return UInt64(bitPattern: Int64(hasher.finalize()))
+    }
+}
+
+extension FocusedInputSnapshot {
+    /// Same value as the context materialized from this snapshot; lets callers that only hold the
+    /// raw snapshot (the typo gate) scope state to the field without materializing a context.
+    var focusedInputIdentityKey: UInt64 {
+        FocusedInputIdentityKey.key(
+            bundleIdentifier: bundleIdentifier,
+            processIdentifier: processIdentifier,
+            elementIdentifier: elementIdentifier
+        )
+    }
+}
