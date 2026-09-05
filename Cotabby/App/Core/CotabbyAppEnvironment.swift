@@ -36,6 +36,7 @@ final class CotabbyAppEnvironment {
     let macroController: MacroController
     let inlineCommandCoordinator: InlineCommandCoordinator
     let emojiUsageStore: EmojiUsageStore
+    let learnedWordStore: LearnedWordStore
     let welcomeCoordinator: WelcomeCoordinator
     let huggingFaceSearchService: HuggingFaceSearchService
     let performanceMetricsStore: PerformanceMetricsStore
@@ -223,6 +224,10 @@ final class CotabbyAppEnvironment {
         // "Clear History" control can reach it, and before the picker which reads and writes it.
         let emojiUsageStore = EmojiUsageStore()
 
+        // Cotabby's own "leave this word alone" list, fed by rejected automatic typo fixes and
+        // shown in Settings. Created here so the spell checker and the settings window share it.
+        let learnedWordStore = LearnedWordStore()
+
         let settingsCoordinator = SettingsCoordinator(
             appUpdateManager: appUpdateManager,
             permissionManager: permissionManager,
@@ -236,6 +241,7 @@ final class CotabbyAppEnvironment {
             performanceMetricsStore: performanceMetricsStore,
             qualityMetricsStore: qualityMetricsStore,
             systemMetricsStore: systemMetricsStore,
+            learnedWordStore: learnedWordStore,
             onShowWelcome: { [weak welcomeCoordinator] in
                 welcomeCoordinator?.showWelcome()
             },
@@ -246,7 +252,7 @@ final class CotabbyAppEnvironment {
         let workController = SuggestionWorkController()
         // Constructed once at app scope so the underlying `NSSpellChecker` document tag survives
         // across coordinator state transitions instead of churning per keystroke.
-        let spellChecker = CurrentWordSpellChecker()
+        let spellChecker = CurrentWordSpellChecker(learnedWords: learnedWordStore)
         // No launch-time preload: a fully built index costs tens of MB resident for a feature that
         // is only consulted once the typo gate actually finds a misspelling, and the first
         // consultation triggers the same background build (`cachedIndexOrRequestLoad`) with the
@@ -340,6 +346,7 @@ final class CotabbyAppEnvironment {
         self.macroController = macroController
         self.inlineCommandCoordinator = inlineCommandCoordinator
         self.emojiUsageStore = emojiUsageStore
+        self.learnedWordStore = learnedWordStore
         self.welcomeCoordinator = welcomeCoordinator
         self.huggingFaceSearchService = huggingFaceSearchService
         self.performanceMetricsStore = performanceMetricsStore

@@ -107,6 +107,12 @@ final class SuggestionCoordinator: ObservableObject {
     /// `FocusCapabilityFlickerGate` for the rationale and the reproduction (Apple Calendar event
     /// editor).
     var capabilityFlickerGate = FocusCapabilityFlickerGate()
+    /// The last few automatic typo fixes, so a deleted-and-retyped word is recognized as the user
+    /// rejecting the fix instead of being corrected again (`CorrectionRejectionDetector`). Records
+    /// carry their field identity, so a stale entry from another field never matches, and the
+    /// bound keeps the per-gate scan trivial.
+    var recentAutomaticCorrections: [AppliedCorrectionRecord] = []
+    static let recentAutomaticCorrectionsCapacity = 8
     /// Correlation ID for the most recently built `SuggestionRequest`. Stamped onto every
     /// state-transition log line so all events tied to one suggestion (debounce → generating →
     /// ready → accepted/rejected) can be joined with a single `jq` filter on `request_id`.

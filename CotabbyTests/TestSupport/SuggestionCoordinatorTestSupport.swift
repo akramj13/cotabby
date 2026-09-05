@@ -249,7 +249,8 @@ func makeCoordinatorRig(
     capability: FocusCapability = .supported,
     overlayState: OverlayState = .hidden(reason: "initial"),
     lowPowerModeEnabled: Bool = false,
-    settingsSnapshot: SuggestionSettingsSnapshot = CotabbyTestFixtures.settingsSnapshot(debounceMilliseconds: 1)
+    settingsSnapshot: SuggestionSettingsSnapshot = CotabbyTestFixtures.settingsSnapshot(debounceMilliseconds: 1),
+    spellChecker: CurrentWordSpellChecker? = nil
 ) -> CoordinatorRig {
     let focusSnapshot = FocusSnapshot(
         applicationName: snapshot.applicationName,
@@ -284,7 +285,7 @@ func makeCoordinatorRig(
         interactionState: interactionState,
         workController: SuggestionWorkController(),
         configuration: .standard,
-        spellChecker: CurrentWordSpellChecker(),
+        spellChecker: spellChecker ?? CurrentWordSpellChecker(),
         symSpellCorrector: SymSpellCorrector(preloadLanguage: nil),
         qualityMetricsStore: SuggestionQualityMetricsStore(
             userDefaults: UserDefaults(suiteName: "CotabbyTests.rig.quality.\(UUID().uuidString)") ?? .standard

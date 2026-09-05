@@ -90,11 +90,11 @@ struct FocusedInputContext: Equatable, Sendable {
     /// growth. `hashValue` is randomized per process, which is fine: the key is only ever compared
     /// within one process's lifetime.
     var focusedInputIdentityKey: UInt64 {
-        var hasher = Hasher()
-        hasher.combine(bundleIdentifier)
-        hasher.combine(processIdentifier)
-        hasher.combine(elementIdentifier)
-        return UInt64(bitPattern: Int64(hasher.finalize()))
+        FocusedInputIdentityKey.key(
+            bundleIdentifier: bundleIdentifier,
+            processIdentifier: processIdentifier,
+            elementIdentifier: elementIdentifier
+        )
     }
 
     /// Content-only fingerprint — mirrors `FocusedInputSnapshot.contentSignature`.

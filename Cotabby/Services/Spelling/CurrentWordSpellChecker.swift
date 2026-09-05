@@ -19,8 +19,14 @@ final class CurrentWordSpellChecker {
     /// Document tag identifies our "spell session" inside `NSSpellChecker.shared`. A unique tag
     /// avoids cross-contamination with whatever spellcheck state other apps have armed.
     private let documentTag: Int
+    /// Words the user kept after an automatic fix was undone. Consulted before `NSSpellChecker`, so
+    /// a learned word is never a typo anywhere Cotabby asks: the typo gate, correction offers, and
+    /// the completion seam guard all route through `isTypo`. Optional so evals and tests that only
+    /// need the native checker can construct this without a store.
+    private let learnedWords: LearnedWordStore?
 
-    init() {
+    init(learnedWords: LearnedWordStore? = nil) {
+        self.learnedWords = learnedWords
         documentTag = NSSpellChecker.uniqueSpellDocumentTag()
         // We deliberately do not mutate `NSSpellChecker.shared` (e.g. forcing
         // `automaticallyIdentifiesLanguages`): that flag is app-global shared state, and overriding
@@ -36,6 +42,9 @@ final class CurrentWordSpellChecker {
     /// punctuation (`nmae,`) where the flagged range stops short of the punctuation.
     func isTypo(_ word: String) -> Bool {
         guard !word.isEmpty else { return false }
+        if learnedWords?.contains(word) == true {
+            return false
+        }
         let misspelledRange = NSSpellChecker.shared.checkSpelling(
             of: word,
             startingAt: 0,
@@ -48,6 +57,12 @@ final class CurrentWordSpellChecker {
             return false
         }
         return misspelledRange.length == (word as NSString).length
+    }
+
+    /// Teaches Cotabby to leave `word` alone from now on (see `LearnedWordStore`). A no-op without a
+    /// store, which is the eval and test configuration.
+    func learn(_ word: String) {
+        learnedWords?.learn(word)
     }
 
     /// `NSSpellChecker`'s own ranked corrections for the word (best first), or an empty array when it

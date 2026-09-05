@@ -25,6 +25,7 @@ struct SettingsContainerView: View {
     @ObservedObject var performanceMetricsStore: PerformanceMetricsStore
     @ObservedObject var qualityMetricsStore: SuggestionQualityMetricsStore
     @ObservedObject var systemMetricsStore: SystemMetricsStore
+    @ObservedObject var learnedWordStore: LearnedWordStore
 
     let onShowWelcome: () -> Void
     let clearEmojiHistory: () -> Void
@@ -141,7 +142,7 @@ struct SettingsContainerView: View {
                 huggingFaceSearchService: huggingFaceSearchService
             )
         case .writing:
-            WritingPaneView(suggestionSettings: suggestionSettings)
+            WritingPaneView(suggestionSettings: suggestionSettings, learnedWordStore: learnedWordStore)
         case .context:
             ContextPaneView(suggestionSettings: suggestionSettings)
         case .shortcuts:

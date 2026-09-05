@@ -6,6 +6,7 @@ import SwiftUI
 /// style rules.
 struct WritingPaneView: View {
     @ObservedObject var suggestionSettings: SuggestionSettingsModel
+    @ObservedObject var learnedWordStore: LearnedWordStore
 
     var body: some View {
         SettingsPaneScaffold {
@@ -120,6 +121,20 @@ struct WritingPaneView: View {
                         SpellingDictionaryPicker(suggestionSettings: suggestionSettings)
                             .settingsItem(.spellingDictionaries)
                     }
+                }
+            }
+
+            // A learned word is exempt from every typo feature (see LearnedWordStore), so the list
+            // stays reachable whenever it is non-empty, even with the typo gate switched off.
+            if suggestionSettings.suppressCompletionsOnTypo || !learnedWordStore.words.isEmpty {
+                Section("Learned Words") {
+                    Text("Words you kept after Cotabby corrected them: delete an automatic fix and "
+                        + "retype the word to add it here. Forget a word to let Cotabby correct it again.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .settingsItem(.learnedWords)
+
+                    LearnedWordsEditor(learnedWordStore: learnedWordStore)
                 }
             }
 

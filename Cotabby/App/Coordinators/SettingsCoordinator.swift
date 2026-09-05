@@ -23,6 +23,7 @@ final class SettingsCoordinator: NSObject, NSWindowDelegate {
     private let performanceMetricsStore: PerformanceMetricsStore
     private let qualityMetricsStore: SuggestionQualityMetricsStore
     private let systemMetricsStore: SystemMetricsStore
+    private let learnedWordStore: LearnedWordStore
     private let onShowWelcome: () -> Void
     private let clearEmojiHistory: () -> Void
 
@@ -48,6 +49,7 @@ final class SettingsCoordinator: NSObject, NSWindowDelegate {
         performanceMetricsStore: PerformanceMetricsStore,
         qualityMetricsStore: SuggestionQualityMetricsStore,
         systemMetricsStore: SystemMetricsStore,
+        learnedWordStore: LearnedWordStore,
         onShowWelcome: @escaping () -> Void,
         clearEmojiHistory: @escaping () -> Void
     ) {
@@ -63,6 +65,7 @@ final class SettingsCoordinator: NSObject, NSWindowDelegate {
         self.performanceMetricsStore = performanceMetricsStore
         self.qualityMetricsStore = qualityMetricsStore
         self.systemMetricsStore = systemMetricsStore
+        self.learnedWordStore = learnedWordStore
         self.onShowWelcome = onShowWelcome
         self.clearEmojiHistory = clearEmojiHistory
     }
@@ -92,6 +95,7 @@ final class SettingsCoordinator: NSObject, NSWindowDelegate {
                     performanceMetricsStore: performanceMetricsStore,
                     qualityMetricsStore: qualityMetricsStore,
                     systemMetricsStore: systemMetricsStore,
+                    learnedWordStore: learnedWordStore,
                     onShowWelcome: onShowWelcome,
                     clearEmojiHistory: clearEmojiHistory,
                     onQuit: { NSApplication.shared.terminate(nil) }
